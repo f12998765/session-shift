@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Ensure tag matches manifest version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          MANIFEST="$(node -p "require('./src/manifest.json').version")"
+          if [ "$TAG" != "$MANIFEST" ]; then
+            echo "Tag v$TAG does not match src/manifest.json version $MANIFEST" >&2
+            exit 1
+          fi
+
+      - run: npm run package
+
+      - name: Attach packaged ZIP to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: releases/session_shift_v*.zip
+          generate_release_notes: true

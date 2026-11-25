@@ -178,3 +178,42 @@ describe('page-api-proxy auth bridge fetch wrapper', () => {
     expect(fetchSpy.mock.calls[0][0]).toBe('https://example.com/set-resource')
   })
 })
+
+describe('page-api-proxy resolves relative URLs against <base href>', () => {
+  let postSpy
+  let fetchSpy
+
+  beforeEach(async () => {
+    vi.resetModules()
+    // Simulate a page whose <base href> points at a different origin (e.g. a CDN).
+    const base = document.createElement('base')
+    base.href = 'https://cdn.example.net/pc/'
+    document.head.appendChild(base)
+    postSpy = vi.spyOn(window, 'postMessage').mockImplementation(() => {})
+    fetchSpy = vi.fn(async (request) => new Response(JSON.stringify({
+      header: request instanceof Request ? request.headers.get('X-SessionShift-Bridge') : null,
+    }), { status: 200 }))
+    Object.defineProperty(window, 'fetch', {
+      configurable: true,
+      writable: true,
+      value: fetchSpy,
+    })
+    await import('../src/page-api-proxy.ts')
+    deliver({ source: 'ext-content', action: 'initNonce', sessionId: SESSION, nonce: NONCE })
+    deliver({ source: 'ext-content', action: 'bootstrapCookies', nonce: NONCE, cookieStr: '' })
+  })
+
+  afterEach(() => {
+    postSpy.mockRestore()
+    delete window.fetch
+    document.head.querySelectorAll('base').forEach((el) => el.remove())
+  })
+
+  it('does not attach the bridge header to a relative fetch that <base href> sends cross-origin', async () => {
+    await window.fetch('mobile/cn.json')
+
+    // Cross-origin: the request must be passed through untouched (a raw string),
+    // so no custom header is added and no CORS preflight is triggered.
+    expect(fetchSpy.mock.calls[0][0]).toBe('mobile/cn.json')
+  })
+})

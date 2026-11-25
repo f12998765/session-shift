@@ -207,7 +207,7 @@
   function buildBridgedRequest(input: RequestInfo | URL, init?: RequestInit): Request | null {
     const request = input instanceof Request
       ? new Request(input, init)
-      : new Request(new URL(String(input), window.location.href).href, init);
+      : new Request(new URL(String(input), document.baseURI).href, init);
     if (!isBridgeableUrl(request.url)) {
       return null;
     }
@@ -240,9 +240,14 @@
     });
   }
 
+  // Resolve relative URLs against document.baseURI, not location.href: a page
+  // can declare <base href> pointing at another origin (e.g. a CDN for assets and
+  // i18n bundles). Using location.href would misclassify those requests as
+  // same-origin, attach the bridge header, and turn them into CORS-preflighted
+  // non-simple requests that CDNs typically reject (405 on OPTIONS).
   function isBridgeableUrl(rawUrl: string): boolean {
     try {
-      const url = new URL(rawUrl, window.location.href);
+      const url = new URL(rawUrl, document.baseURI);
       return url.origin === window.location.origin && (url.protocol === 'https:' || url.protocol === 'http:');
     } catch {
       return false;
