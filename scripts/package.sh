@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="$(grep '"version"' "$ROOT/src/manifest.json" | sed 's/.*"version": *"\([^"]*\)".*/\1/')"
 OUT="$ROOT/releases/session_shift_v${VERSION}.zip"
 
+mkdir -p "$ROOT/releases"
 bash "$ROOT/scripts/build.sh"
 node "$ROOT/scripts/validate-localization-artifacts.mjs" dist
 rm -f "$OUT"
